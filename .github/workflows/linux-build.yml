@@ -1,0 +1,74 @@
+name: Oldosfan Minetest/Luanti Build (Linux)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build on Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libjpeg-dev \
+            libsqlite3-dev \
+            libfreetype6-dev \
+            libluajit-5.1-dev \
+            libgmp-dev \
+            libjsoncpp-dev \
+            gettext \
+            libsdl2-dev \
+            libopenal-dev \
+            libvorbis-dev \
+            libcurl4-openssl-dev \
+            libzstd-dev \
+            libpq-dev \
+            libncurses-dev
+
+      - name: Clone Minetest from Codeberg
+        run: git clone --depth=1 https://codeberg.org/halon/Minetest minetest
+
+      - name: Clone mcl_localplayer mod
+        run: |
+          git clone --depth=1 https://codeberg.org/halon/mcl_localplayer minetest/clientmods/mcl_localplayer
+
+      - name: Create mods.conf
+        run: echo "load_mod_mcl_localplayer = true" > minetest/clientmods/mods.conf
+
+      - name: Configure CMake project
+        run: |
+          cd minetest
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF
+
+      - name: Build Minetest (Release)
+        run: |
+          cd minetest
+          cmake --build build --config Release
+
+      - name: Cleanup unwanted files and folders
+        run: |
+          cd minetest
+          rm -rf .github .vscode android build cmake doc fastlane irr lib src
+          rm -f .clang-tidy .dockerignore .editorconfig .gitattributes .gitignore \
+                .gitlab-ci.yml .luacheckrc .mailmap CMakeLists.txt CMakePresets.json \
+                CNAME COPYING.LESSER Dockerfile README.md shell.nix vcpkg.json
+
+      - name: Rename and zip the output
+        run: |
+          cd minetest
+          export TZ=Asia/Kolkata
+          NOW=$(date +"%d-%B-%Y")
+          cd ..
+          mv minetest "minetest-linux-$NOW"
+          zip -r "minetest-linux-$NOW.zip" "minetest-linux-$NOW"
+
+      - name: Upload zipped Minetest build
+        uses: actions/upload-artifact@v4
+        with:
+          name: minetest-linux-build
+          path: minetest-linux-*.zip
