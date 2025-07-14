@@ -1,0 +1,137 @@
+name: Oldosfan Minetest/Luanti Build (Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Clone Minetest from Codeberg
+        run: |
+          git clone --depth=1 https://codeberg.org/halon/Minetest minetest
+
+      - name: Clone mcl_localplayer mod
+        run: |
+          git clone --depth=1 https://codeberg.org/halon/mcl_localplayer minetest/clientmods/mcl_localplayer
+          echo "load_mod_mcl_localplayer = true" > minetest/clientmods/mods.conf
+
+      - name: Clone vcpkg from GitHub
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git minetest/vcpkg
+
+      - name: Bootstrap vcpkg
+        run: |
+          cd minetest/vcpkg
+          .\bootstrap-vcpkg.bat
+
+      - name: Install dependencies with vcpkg (classic mode)
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\minetest\vcpkg
+        run: |
+          cd minetest
+          if (Test-Path vcpkg.json) { Remove-Item vcpkg.json -Force }
+              .\vcpkg\vcpkg.exe install `
+                zlib:x64-windows `
+                libjpeg-turbo:x64-windows `
+                sqlite3:x64-windows `
+                freetype:x64-windows `
+                luajit:x64-windows `
+                gmp:x64-windows `
+                jsoncpp:x64-windows `
+                gettext:x64-windows `
+                sdl2:x64-windows `
+                openal-soft:x64-windows `
+                libvorbis:x64-windows `
+                curl:x64-windows `
+                leveldb:x64-windows `
+                zstd:x64-windows `
+                openssl:x64-windows `
+                --recurse --clean-after-build
+
+      - name: Configure CMake project
+        run: |
+          cd minetest
+          cmake -S . -B build -G "Visual Studio 17 2022" `
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/minetest/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_UNITTESTS=OFF `
+            -DENABLE_GETTEXT=ON `
+            -DENABLE_SOUND=ON `
+            -DENABLE_CURL=ON `
+            -DENABLE_LEVELDB=ON `
+            -DENABLE_LUAJIT=ON `
+            -DENABLE_SPATIAL=OFF `
+            -DENABLE_PROMETHEUS=OFF `
+            -DENABLE_SYSTEM_GMP=OFF `
+            -DENABLE_POSTGRESQL=OFF `
+            -DENABLE_REDIS=OFF `
+            -DENABLE_FREETYPE=ON `
+            -DENABLE_OPENSSL=ON
+
+      - name: Build Minetest (Release)
+        run: |
+          cd minetest
+          cmake --build build --config Release
+
+      - name: Remove unwanted folders and files
+        run: |
+          # Remove directories
+          $dirs = @(
+            "minetest\.github",
+            "minetest\.vscode",
+            "minetest\android",
+            "minetest\build",
+            "minetest\cmake",
+            "minetest\doc",
+            "minetest\fastlane",
+            "minetest\irr",
+            "minetest\lib",
+            "minetest\src",
+            "minetest\vcpkg"
+          )
+          foreach ($d in $dirs) {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d }
+          }
+
+          # Remove files
+          $files = @(
+            "minetest\.clang-tidy",
+            "minetest\.dockerignore",
+            "minetest\.editorconfig",
+            "minetest\.gitattributes",
+            "minetest\.gitignore",
+            "minetest\.gitlab-ci.yml",
+            "minetest\.luacheckrc",
+            "minetest\.mailmap",
+            "minetest\CMakeLists.txt",
+            "minetest\CMakePresets.json",
+            "minetest\CNAME",
+            "minetest\COPYING.LESSER",
+            "minetest\Dockerfile",
+            "minetest\README.md",
+            "minetest\shell.nix"
+          )
+          foreach ($f in $files) {
+            if (Test-Path $f) { Remove-Item -Force $f }
+          }
+        shell: pwsh
+
+      - name: Get current IST date for archive folder
+        id: get_date
+        run: |
+          $ISTTime = (Get-Date).ToUniversalTime().AddHours(5.5)
+          $formattedDate = $ISTTime.ToString("dd-MMMM-yyyy")
+          echo "foldername=minetest-windows-$formattedDate" >> $env:GITHUB_ENV
+
+      - name:  Make the archive
+        run: |
+          Compress-Archive -Path minetest -DestinationPath "${{ env.foldername }}.zip"
+
+      - name: Upload Final Zipped Minetest Build for windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.foldername }}
+          path: ${{ env.foldername }}.zip
