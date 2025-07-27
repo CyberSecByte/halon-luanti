@@ -13,22 +13,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libjpeg-dev \
-            libsqlite3-dev \
-            libfreetype6-dev \
-            libluajit-5.1-dev \
-            libgmp-dev \
-            libjsoncpp-dev \
-            gettext \
-            libsdl2-dev \
-            libopenal-dev \
-            libvorbis-dev \
-            libcurl4-openssl-dev \
-            libzstd-dev \
-            libpq-dev \
-            libncurses-dev
+          build-essential \
+          cmake \
+          libjpeg-dev \
+          libsqlite3-dev \
+          libfreetype6-dev \
+          libluajit-5.1-dev \
+          libgmp-dev \
+          gettext \
+          libsdl2-dev \
+          libopenal-dev \
+          libvorbis-dev \
+          libcurl4-openssl-dev \
+          libzstd-dev \
+          libpq-dev \
+          libncurses-dev \
+          zip
 
       - name: Clone Minetest from Codeberg
         run: git clone --depth=1 https://codeberg.org/halon/Minetest minetest
@@ -43,7 +43,7 @@ jobs:
       - name: Configure CMake project
         run: |
           cd minetest
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_UNITTESTS=OFF -DENABLE_STATIC_JSONCPP=OFF
 
       - name: Build Minetest (Release)
         run: |
